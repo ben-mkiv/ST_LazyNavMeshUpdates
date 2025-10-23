@@ -6,7 +6,6 @@
 // the navigation rebuild will be locked until the move action was finished (mouse up)
 // then the actor bounds on begin and end move will be marked dirty on the navmesh, causing it to rebuild
 
-// todo: a toolbar button to disable the lock would be neat for when the user wants to move stuff while watching the navmesh changes
 class FST_LazyNavMeshUpdateModule : public IModuleInterface
 {
 public:
