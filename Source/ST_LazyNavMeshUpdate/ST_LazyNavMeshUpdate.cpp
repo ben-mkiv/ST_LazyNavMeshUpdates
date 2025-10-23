@@ -57,21 +57,24 @@ void FST_LazyNavMeshUpdateModule::OnBeginMove(UObject& Object)
 	if(!bLazyUpdates)
 		return;
 	
-	if (UWorld* World = Object.GetWorld())
+	if(AActor *AsActor = Cast<AActor>(&Object))
 	{
-		if(World->WorldType != EWorldType::Editor)
-			return;
-		
-		if (auto* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
+		if (UWorld *World = AsActor->GetWorld())
 		{
-			NavSys->AddNavigationBuildLock(ENavigationBuildLock::Custom);
-
-			const FBox ActorBounds = GetActorBounds(&Object);
-			if(ActorBounds.IsValid && ActorBounds.GetSize().Length() > 0)
+			if(World->WorldType != EWorldType::Editor)
+				return;
+			
+			if (auto *NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
 			{
-				//UE_LOG(LogTemp, Warning, TEXT("[FST_LazyNavMeshUpdateModule::OnBeginMove] LOCK NAV REBUILD for %s"), *Object.GetName());
-				BoundsBeginMove = ActorBounds;				
-			}		
+				NavSys->AddNavigationBuildLock(ENavigationBuildLock::Custom);
+
+				const FBox ActorBounds = GetActorBounds(AsActor);
+				if(ActorBounds.IsValid && ActorBounds.GetSize().Length() > 0)
+				{
+					//UE_LOG(LogTemp, Warning, TEXT("[FST_LazyNavMeshUpdateModule::OnBeginMove] LOCK NAV REBUILD for %s"), *Object.GetName());
+					ActorBoundsCache.Add(AsActor, ActorBounds);				
+				}		
+			}
 		}
 	}
 }
@@ -80,28 +83,31 @@ void FST_LazyNavMeshUpdateModule::OnEndMove(UObject& Object)
 {
 	if(!bLazyUpdates)
 		return;
-		
-	if (UWorld* World = Object.GetWorld())
-	{
-		if(World->WorldType != EWorldType::Editor)
-			return;
-				
-		if (auto* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
-		{
-			//UE_LOG(LogTemp, Warning, TEXT("[FST_LazyNavMeshUpdateModule::OnEndMove] UNLOCK NAV REBUILD for %s"), *Object.GetName());
-			NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::Custom, UNavigationSystemV1::ELockRemovalRebuildAction::NoRebuild);
 
-			const FBox ActorBounds = GetActorBounds(&Object);
-			if(ActorBounds.IsValid && ActorBounds.GetSize().Length() > 0)
+	if(AActor *AsActor = Cast<AActor>(&Object))
+	{
+		if(UWorld *World = Object.GetWorld())
+		{
+			if(World->WorldType != EWorldType::Editor)
+				return;
+					
+			if (auto *NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World))
 			{
-				NavSys->AddDirtyArea(ActorBounds, ENavigationDirtyFlag::NavigationBounds);
+				//UE_LOG(LogTemp, Warning, TEXT("[FST_LazyNavMeshUpdateModule::OnEndMove] UNLOCK NAV REBUILD for %s"), *Object.GetName());
+				NavSys->RemoveNavigationBuildLock(ENavigationBuildLock::Custom, UNavigationSystemV1::ELockRemovalRebuildAction::NoRebuild);
+
+				const FBox ActorBounds = GetActorBounds(AsActor);
+				if(ActorBounds.IsValid && ActorBounds.GetSize().Length() > 0)
+				{
+					NavSys->AddDirtyArea(ActorBounds, ENavigationDirtyFlag::NavigationBounds);
+				}
+				
+				if(FBox *BoundsBegin = ActorBoundsCache.Find(AsActor))
+				{
+					NavSys->AddDirtyArea(*BoundsBegin, ENavigationDirtyFlag::NavigationBounds);	
+					ActorBoundsCache.Remove(AsActor);
+				}									
 			}
-			
-			if(FBox *BoundsBegin = BoundsBeginMove.GetPtrOrNull())
-			{
-				NavSys->AddDirtyArea(*BoundsBegin, ENavigationDirtyFlag::NavigationBounds);	
-				BoundsBeginMove.Reset();
-			}									
 		}
 	}
 }

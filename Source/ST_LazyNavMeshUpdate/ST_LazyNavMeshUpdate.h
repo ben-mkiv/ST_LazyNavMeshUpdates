@@ -25,7 +25,7 @@ public:
 private:
 	
 	// tracks actor bounds from the begin move event
-	TOptional<FBox> BoundsBeginMove;
+	TMap<TWeakObjectPtr<AActor>, FBox> ActorBoundsCache;
 	
 	static FBox GetActorBounds(UObject *Object);
 };
